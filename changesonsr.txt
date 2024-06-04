@@ -1,0 +1,139 @@
+        public List<string> CreateUpdateSchedule(DataTable dt)
+        {
+            // CustOledbConnection objCon = new CustOledbConnection(Constant.Password);
+            PGSqlConnection objCon = new PGSqlConnection(Constant.Password);
+           
+            string[] strResult = new string[3];
+            NpgsqlDataReader drCheck = null;
+            StringBuilder MyStringBuilder = new StringBuilder();
+            List<string> listForms = new List<string>();
+            string[] strItemCodeName = new string[2];
+            string userid = Convert.ToString(HttpContext.Current.Session["UserId"]);
+            try
+            {
+                AppException.LogErrorTimeDiff(Convert.ToString(System.Web.HttpContext.Current.Session["LocationCodeName"]),
+               Convert.ToString(System.Web.HttpContext.Current.Session["RoleID"]), System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name,
+               System.Reflection.MethodBase.GetCurrentMethod().Name, "Start", Convert.ToString(System.DateTime.Now));
+                objCon.BeginTransaction();
+
+                for (int i = 0; i < dt.Rows.Count; i++)
+                {
+                    int test = 0;
+                    int error0 = i + 1;
+                    MyStringBuilder.Append("In Row = " + error0 + " ");
+                    ItemCodeName = Convert.ToString(dt.Rows[i]["ITEM_CODE"]) + '~' + Convert.ToString(dt.Rows[i]["ITEM_NAME"]);
+                    ScheduleRatePrice = Convert.ToString(dt.Rows[i]["PRICE"]);
+                    ScheduleRateEffectFrom = Convert.ToString(dt.Rows[i]["EFFECT_FROM_DATE"]);
+
+                    Remark = Convert.ToString(dt.Rows[i]["REMARK"]);
+                    strItemCodeName = ItemCodeName.Split('~');
+                    strItemId = Convert.ToString(objCon.get_value("SELECT IT_ID FROM TBLITEMMASTER WHERE UPPER(IT_CODE)='" + strItemCodeName[0].Trim() + "' OR IT_NAME='" + strItemCodeName[1].Trim() + "'"));
+                    if (strItemId != "")
+                    {
+
+                        ScheduleRateId = Convert.ToInt32(objCon.get_value("SELECT COALESCE(MAX(SR_ID), 0) FROM TBLSRMASTER WHERE SR_IT_ID='" + strItemId + "' AND SR_EFFECT_TO IS NULL "));
+                        if (ScheduleRateId == 0)
+                        {
+                            strQry = "SELECT SR_IT_ID FROM TBLSRMASTER WHERE SR_IT_ID='" + strItemId + "' AND SR_ID   <>'" + ScheduleRateId + "'";
+                            drCheck = objCon.Fetch(strQry);
+                            if (drCheck.Read())
+                            {
+
+                                drCheck.Close();
+                                test++;
+                                MyStringBuilder.Append("Item Name and Code Already exit..  ");
+                                //strResult[0] = "Item Name already exist " + erro + " th row ";
+                                //listForms.Add(strResult[0]);
+
+                                //strResult[1] = "2";
+                                //objCon.RollBack();
+                                //return strResult;
+                            }
+                            else
+                            {
+
+                                strQry = "INSERT INTO tblsrmaster(sr_id,sr_it_id,sr_price,sr_effect_from,sr_remark,sr_entry_auth) VALUES('" + objCon.Get_max_no("sr_id", "tblsrmaster") + "','" + strItemId + "','" + ScheduleRatePrice + "','" + ScheduleRateEffectFrom + "','" + Remark + "','" + Convert.ToString(HttpContext.Current.Session["UserId"]) + "')";
+                                objCon.ExecuteQry(strQry);
+                            }
+                            //  strResult[0] = "Schedule Rate saved Succesfully";
+                            // strResult[1] = "0";
+                        }
+
+                        else
+                        {
+                            double price = Convert.ToDouble(objCon.get_value("SELECT SR_PRICE FROM TBLSRMASTER WHERE SR_IT_ID='" + strItemId + "' AND SR_ID='" + ScheduleRateId + "'"));
+
+                            DateTime chkdate = Convert.ToDateTime(objCon.get_value("SELECT SR_EFFECT_FROM FROM TBLSRMASTER WHERE SR_IT_ID='" + strItemId + "' AND SR_ID='" + ScheduleRateId + "'"));
+                            double excelprice = Convert.ToDouble(ScheduleRatePrice);
+                            double dbprice = price;
+                            string[] checkdate2 = chkdate.ToString().Substring(0, 10).Split('/');
+                            string checkdate3 = checkdate2[2] + '-' + checkdate2[0] + '-' + checkdate2[1];
+                            DateTime effectto = Convert.ToDateTime(ScheduleRateEffectFrom);
+                           string[] effect1 = effectto.ToString().Substring(0, 10).Split('/');
+                          string effect2 = effect1[2]+'-'+effect1[0]+'-'+ effect1[1];
+                            string effect3 = effect2.Replace(" ", "");
+
+                            //string effect3 = effect2.Trim(, '');
+                            strQry = "UPDATE TBLSRMASTER SET SR_EFFECT_TO='" + effect3 + "' WHERE SR_ID='" + ScheduleRateId + "' AND SR_IT_ID='" + strItemId + "'";
+                                         objCon.ExecuteQry(strQry);
+                            if (ScheduleRateEffectFrom.Contains('/'))
+                            {
+                                string[] ScheduleRateEffectFrom2 = ScheduleRateEffectFrom.Substring(0, 10).Split('/');
+                                string ScheduleRateEffectFrom3 = ScheduleRateEffectFrom2[2] + '-' + ScheduleRateEffectFrom2[1] + '-' + ScheduleRateEffectFrom2[0];
+
+                                strQry = "INSERT INTO tblsrmaster(sr_id,sr_it_id,sr_price,sr_effect_from,sr_remark,sr_entry_auth) VALUES('" + objCon.Get_max_no("sr_id", "tblsrmaster") + "','" + strItemId + "','" + ScheduleRatePrice + "','" + ScheduleRateEffectFrom3 + "','" + Remark + "','" + Convert.ToString(HttpContext.Current.Session["UserId"]) + "')";
+                                objCon.ExecuteQry(strQry);
+                            }
+                            else
+                            {
+                                strQry = "INSERT INTO tblsrmaster(sr_id,sr_it_id,sr_price,sr_effect_from,sr_remark,sr_entry_auth) VALUES('" + objCon.Get_max_no("sr_id", "tblsrmaster") + "','" + strItemId + "','" + ScheduleRatePrice + "','" + ScheduleRateEffectFrom + "','" + Remark + "','" + Convert.ToString(HttpContext.Current.Session["UserId"]) + "')";
+                                objCon.ExecuteQry(strQry);
+                            }
+                           
+                        }
+                    }
+                    else
+                    {
+                        test++;
+                        MyStringBuilder.Append("ItemCode-Name DoesNotExist ,  ");
+                        //strResult[0] = "ItemCode-Name DoesNotExist...." + erro + " th row ";
+                        //listForms.Add(strResult[0]);          
+                        // objCon.RollBack();
+                        // return strResult;
+                    }
+                    if (test > 0)
+                    {
+                        listForms.Add(Convert.ToString(MyStringBuilder));
+                    }
+                    MyStringBuilder.Clear();
+                }
+
+                if (listForms.Count > 0)
+                {
+                    objCon.RollBackTrans();
+                    objCon.close();
+                }
+                else
+                {
+
+                    objCon.CommitTransaction();
+                    objCon.close();
+                }
+            }
+            catch (Exception ex)
+            {
+                objCon.RollBackTrans();
+
+                objCon.close();
+                strResult[0] = "Error:" + ex.Message;
+                strResult[1] = "2";
+                clsErrorLog.LogError("ScheduleRate.cs", "CreateUpdateSchedule", ex.Message, ex.StackTrace, "web");
+                return listForms;
+            }
+            objCon.close();
+
+            AppException.LogErrorTimeDiff(Convert.ToString(System.Web.HttpContext.Current.Session["LocationCodeName"]),
+               Convert.ToString(System.Web.HttpContext.Current.Session["RoleID"]), System.Reflection.MethodBase.GetCurrentMethod().DeclaringType.Name,
+               System.Reflection.MethodBase.GetCurrentMethod().Name, "End", Convert.ToString(System.DateTime.Now));
+            return listForms;
+        }
